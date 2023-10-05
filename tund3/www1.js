@@ -3,6 +3,7 @@ const http = require('http');
 const url = require('url');
 const path = require('path');
 const fs = require('fs');
+const querystring = require('querystring');
 const dateTime = require('./dateTimeET');
 const pageHead ='<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n<title>JMK</title>\n</head><body>'
 const pageBanner = '\n\t<img src="banner.png" alt="Kursuse bänner">';
@@ -21,14 +22,47 @@ const semesterDuration = Math.floor((semesterEnd - semesterBegin) / 86.4e6);
 http.createServer(function(req, res){
 	let currentURL = url.parse(req.url, true);
 	//console.log(currentURL);
-	if (currentURL.pathname === "/"){
+	if(req.method === 'POST'){
+		//res.end('Tuligi POST!');
+		collectRequestData(req, result => {
+            console.log(result);
+			//Kirjutame andmeid tekstifaili
+			fs.open('public/namelog.txt', 'a', (err, file) =>{
+				if (err) {
+					throw err;
+				}
+				else {
+					fs.appendFile('public/namelog.txt', result.firstNameInput + ':', (err) => {
+						if (err) {
+							throw err;
+						}
+						else {
+							console.log('fail kirjutati')
+						}
+					});
+					/*fs.close(file, (err)=>{
+						if (err);
+							throw err
+					});*/
+				}
+
+			});
+
+
+			res.end(result.firstNameInput);
+		});
+	}
+
+	else if (currentURL.pathname === "/"){
 		res.writeHead(200, {"Content-type": "text/html"}); // 200 = leht töötab
 		res.write(pageHead);
 		res.write(pageBanner);
 		res.write(pageBody);
+		res.write(semester);
 		res.write('\n\t<hr>\n\t<p><a href="addname">Lisa oma nimi</a>!</p>');
 		res.write(pageFoot);
-		res.write('<p>Täna on ' + dateTime.dateOfToday() + ', ' + dateTime.dayOfToday() + '</p>');
+		res.write('\n\t<p><a href="tluphoto">Pilte Tallinna Ülikoolist</a></p>');
+		res.write('<p>Täna on ' + dateTime.timeETformatted() + ', ' + dateTime.dateETformatted() + '</p>');
 		//console.log("Keegi vaatab!");
 		return res.end();
 	}
@@ -39,10 +73,37 @@ http.createServer(function(req, res){
 		res.write(pageBanner);
 		res.write(pageBody);
 		res.write('\n\t<hr>\n\t<h2>Lisa palun oma nimi</h2>');
-		res.write('\n\t<p>Edaspidi lisame siia asju!</p>');
+		res.write('\n\t<form method="POST">\n<label for="firstNameInput">Eesnimi</label>\n<input type="text" name="firstNameInput" id="firstNameInput" placeholder="Sinu Eesnimi">\n<br>\n<label for="lastNameInput">Perekonnami</label>\n<input type="text" name="lastNameInput" id="lastNameInput" placeholder="Sinu Perekonnanimi">\n<br>\n<input type="submit" name="submit" value="Kinnita">\n</form>');
 		res.write(pageFoot);
 		return res.end();
 	}
+	
+	else if (currentURL.pathname === "/tluphoto"){
+		//loeme kataloogist fotode nimekirja ja loosime ühe pildi
+		let htmlOutput = '\n\t<p>Pilti ei saa näidata!</p>';
+		fs.readdir('public/tluphotos', (err, fileList)=>{
+			if(err) {
+				throw err;
+				tluPhotoPage(res, htmlOutput);
+			}
+			else {
+				//console.log(fileList);
+				let photoNum = Math.floor(Math.random() * fileList.length);
+				htmlOutput = '\n\t<img src="' + fileList[photoNum] + '" alt="TLÜ pilt">';
+				//console.log(htmlOutput);
+				
+				listOutput = '\n\t<ul>';
+				for (fileName of fileList) {
+					listOutput += '\n\t<li>' + fileName + '</li>'
+				}
+				listOutput += '\n\t</ul>';
+				//console.log(listOutput);
+				tluPhotoPage(res, htmlOutput, listOutput);
+			}
+		});
+	}
+	//else if (currentURL.pathname === "/tlu_10.jpg"){ 
+	
 	else if (currentURL.pathname === '/semesterprogress'){
 		res.writeHead(200, {'Content-type': 'text/html'});
 		res.write(pageHead);
@@ -72,6 +133,7 @@ http.createServer(function(req, res){
 	else if (currentURL.pathname === "/banner.png"){
 		console.log("Tahame pilti!");
 		let bannerPath = path.join(__dirname, "public", "banner");
+		//let tluPhotoPath = path.join(__dirname, "public", "photos");
 		//console.log(bannerPath + currentURL.pathname);
 		fs.readFile(bannerPath + currentURL.pathname, (err, data)=>{
 			if (err) {
@@ -84,16 +146,55 @@ http.createServer(function(req, res){
 			}
 		});
 
-	if (currentURL.pathname === "/semesterprogress"){
-		sisu = 0 
-
-	};
 	}
+    //else if (currentURL.pathname === "/tlu_42.jpg"){
+	else if (path.extname(currentURL.pathname) === ".jpg"){
+		console.log(path.extname(currentURL.pathname));
+		//let filePath = path.join(__dirname, "public", "tluphotos/tlu_42.jpg");
+		let filePath = path.join(__dirname, "public", "tluphotos");
+		fs.readFile(filePath + currentURL.pathname, (err, data)=>{
+			if(err){
+				throw err;
+			}
+			else {
+				res.writeHead(200, {"Content-Type": "image/jpeg"});
+				res.end(data);
+			}
+		});
+	} 
 	else {
 		res.end("ERROR 404");
 	}
 	//valmis, saada ära
 }).listen(5119);
 
-
+function tluPhotoPage(res, htmlOut){
+	res.writeHead(200, {"Content-Type": "text/html"});
+	res.write(pageHead);
+	res.write(pageBanner);
+	res.write(pageBody);
+	res.write('\n\t<hr>');
+	res.write(htmlOut);
+	//res.write('\n\t<img src="tlu_42.jpg" alt="TLÜ foto">');
+	res.write('\n\t <p><a href="/">Tagasi avalehele</a>!</p>');
+	res.write(listOutput)
+	res.write(pageFoot);
+	//et see kõik valmiks ja ära saadetaks
+	return res.end();
+}
+function collectRequestData(request, callback) {
+    const FORM_URLENCODED = 'application/x-www-form-urlencoded';
+    if(request.headers['content-type'] === FORM_URLENCODED) {
+        let receivedData = '';
+        request.on('data', chunk => {
+            receivedData += chunk.toString();
+        });
+        request.on('end', () => {
+            callback(querystring.decode(receivedData));
+        });
+    }
+    else {
+        callback(null);
+    }
+}
     //rinde .listen(5100)

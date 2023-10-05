@@ -28,4 +28,4 @@ const timeOfDayET = function(){
 
 //ekspordin kõik asjad
 module.exports = {dateETformatted: dateETformatted, timeETformatted: timeETformatted, monthsET: monthNamesET, timeOfDayET: timeOfDayET};
-console.log(monthNamesET)
+//console.log(monthNamesET)
